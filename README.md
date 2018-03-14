@@ -3,7 +3,7 @@ Based on gstreamer
 
 Setup:
 git clone Cinder --recursive
-
+git clone Warping-block in Cinder/blocks
 In the parent folder of Cinder create a folder named Videodromm and git clone https://github.com/videodromm/VideodrommVideoPlayer
 
 Follow instructions on https://github.com/cinder/Cinder/pull/1947:
