@@ -38,6 +38,7 @@ private:
 	// Warping
 	WarpList		mWarps;
 	fs::path		mSettings;
+	Area			mSrcArea;
 };
 
 
@@ -64,7 +65,8 @@ VideoPlayerApp::VideoPlayerApp()
 		mWarps.push_back(WarpPerspectiveBilinear::create());
 	}
 	// adjust the content size of the warps
-	Warp::setSize(mWarps, mMovie->getSize());
+	mSrcArea = Area(0, 0, getWindowWidth(), getWindowHeight());
+	Warp::setSize(mWarps,ivec2(1280,720));
 }
 void VideoPlayerApp::resize()
 {
@@ -179,8 +181,12 @@ void VideoPlayerApp::loadMovieFile(const fs::path &moviePath)
 	try {
 		// load up the movie, set it to loop, and begin playing
 		mMovie = qtime::MovieGl::create(moviePath);
-		//mMovie->setLoop();
+		
+		mMovie->setLoop();
 		mMovie->play();
+		// mSrcArea = mMovie->getBounds();
+		// Warp::setSize(mWarps, mMovie->getSize());
+
 		console() << "Playing: " << mMovie->isPlaying() << std::endl;
 	}
 	catch (ci::Exception &exc) {
@@ -200,6 +206,8 @@ void VideoPlayerApp::draw()
 			warp->begin();
 			Rectf centeredRect = Rectf(mFrameTexture->getBounds()).getCenteredFit(getWindowBounds(), true);
 			gl::draw(mFrameTexture, centeredRect);
+			//warp->draw(mFrameTexture, mFrameTexture->getBounds());
+			//warp->draw(mFrameTexture, mSrcArea, warp->getBounds());
 			warp->end();
 		}
 	}
@@ -207,9 +215,12 @@ void VideoPlayerApp::draw()
 
 void prepareSettings(App::Settings *settings)
 {
-	settings->setWindowSize(640, 480);
+	settings->setWindowSize(1280, 720);
 	settings->setMultiTouchEnabled(false);
+	settings->setBorderless();
+#ifdef _DEBUG
 	settings->setConsoleWindowEnabled();
+#endif
 }
 
 CINDER_APP(VideoPlayerApp, RendererGl, prepareSettings)
