@@ -1,0 +1,489 @@
+From 99e4e8fbd521d0d073236b8a6d52bc712a609f3f Mon Sep 17 00:00:00 2001
+From: Petros Kataras <petroskataras@gmail.com>
+Date: Thu, 28 Dec 2017 12:04:00 +0100
+Subject: [PATCH 1/5] Add option for using GStreamer as the video backend on
+ MSW.
+
+---
+ include/cinder/qtime/QuickTimeGl.h |  2 +-
+ proj/cmake/platform_msw.cmake      | 47 ++++++++++++++++++++++++++++++++++++++
+ src/cinder/linux/GstPlayer.cpp     | 10 +++++++-
+ 3 files changed, 57 insertions(+), 2 deletions(-)
+ mode change 100644 => 100755 proj/cmake/platform_msw.cmake
+
+diff --git a/include/cinder/qtime/QuickTimeGl.h b/include/cinder/qtime/QuickTimeGl.h
+index 7d21110715..d9a6331459 100644
+--- a/include/cinder/qtime/QuickTimeGl.h
++++ b/include/cinder/qtime/QuickTimeGl.h
+@@ -31,7 +31,7 @@
+ 	#include "cinder/qtime/QuickTimeGlImplLegacy.h"
+ #elif ( ! defined( CINDER_MAC_USE_GSTREAMER ) && defined( CINDER_MAC ) && ( MAC_OS_X_VERSION_MIN_REQUIRED >= 1080 ) ) || defined( CINDER_COCOA_TOUCH )
+ 	#include "cinder/qtime/QuickTimeGlImplAvf.h"
+-#elif defined( CINDER_MAC_USE_GSTREAMER )
++#elif defined( CINDER_MAC_USE_GSTREAMER ) || defined( CINDER_MSW_USE_GSTREAMER )
+ 	#include "cinder/linux/Movie.h" 
+ #elif defined( CINDER_ANDROID )
+ 	#include "cinder/android/MovieGl.h" 
+diff --git a/proj/cmake/platform_msw.cmake b/proj/cmake/platform_msw.cmake
+old mode 100644
+new mode 100755
+index 274ee756ae..7f020181d0
+--- a/proj/cmake/platform_msw.cmake
++++ b/proj/cmake/platform_msw.cmake
+@@ -50,6 +50,53 @@ list( APPEND CINDER_SRC_FILES
+ 	${SRC_SET_CINDER_AUDIO_DSP}
+ )
+ 
++# Option for using GStreamer under MSW.
++if( CINDER_MSW )
++	option( CINDER_MSW_USE_GSTREAMER "Use GStreamer for video playback." OFF )
++endif()
++
++if( CINDER_MSW_USE_GSTREAMER )
++    set( GST_ROOT $ENV{GSTREAMER_1_0_ROOT_X86_64} )
++    if( GST_ROOT )
++	    list( APPEND CINDER_LIBS_DEPENDS 
++	                ${GST_ROOT}/lib/gstreamer-1.0.lib
++	                ${GST_ROOT}/lib/gstapp-1.0.lib
++	                ${GST_ROOT}/lib/gstvideo-1.0.lib
++	                ${GST_ROOT}/lib/gstbase-1.0.lib
++	                ${GST_ROOT}/lib/gstnet-1.0.lib
++	                ${GST_ROOT}/lib/gstaudio-1.0.lib
++                    ${GST_ROOT}/lib/gstgl-1.0.lib
++	                ${GST_ROOT}/lib/gobject-2.0.lib
++	                ${GST_ROOT}/lib/gmodule-2.0.lib
++	                ${GST_ROOT}/lib/gthread-2.0.lib
++	                ${GST_ROOT}/lib/glib-2.0.lib
++	                ${GST_ROOT}/lib/gio-2.0.lib
++	                ${GST_ROOT}/lib/pangowin32-1.0.lib
++	                ${GST_ROOT}/lib/pangocairo-1.0.lib
++	                ${GST_ROOT}/lib/gdk_pixbuf-2.0.lib
++	                ${GST_ROOT}/lib/pango-1.0.lib
++	                ${GST_ROOT}/lib/cairo.lib
++	                ${GST_ROOT}/lib/ffi.lib
++	                ${GST_ROOT}/lib/intl.lib )
++
++	    list( APPEND CINDER_INCLUDE_SYSTEM_PRIVATE 
++	                ${GST_ROOT}/include 
++                    ${GST_ROOT}/include/gstreamer-1.0
++                    ${GST_ROOT}/include/glib-2.0
++                    ${GST_ROOT}/lib/gstreamer-1.0/include
++                    ${GST_ROOT}/lib/glib-2.0/include
++	                ${CINDER_INC_DIR}/cinder/linux )
++
++	    list( APPEND CINDER_SRC_FILES 
++	                ${CINDER_SRC_DIR}/cinder/linux/GstPlayer.cpp 
++	                ${CINDER_SRC_DIR}/cinder/linux/Movie.cpp )
++
++	    list( APPEND CINDER_DEFINES CINDER_MSW_USE_GSTREAMER )
++	else()
++		message( WARNING "Requested GStreamer video playback support for MSW but no suitable GStreamer installation found. Make sure that GStreamer is installed properly and GSTREAMER_1_0_ROOT_X86_64 is defined in your env variables. " )
++    endif()
++endif()
++
+ source_group( "cinder\\msw"       	FILES ${SRC_SET_MSW} )
+ source_group( "cinder\\app\\msw"  	FILES ${SRC_SET_APP_MSW} )
+ source_group( "cinder\\audio\\msw"  FILES ${SRC_SET_AUDIO_MSW} )
+diff --git a/src/cinder/linux/GstPlayer.cpp b/src/cinder/linux/GstPlayer.cpp
+index 37ebaaac33..f852522806 100644
+--- a/src/cinder/linux/GstPlayer.cpp
++++ b/src/cinder/linux/GstPlayer.cpp
+@@ -6,7 +6,7 @@
+ 
+ #include "cinder/linux/GstPlayer.h"
+ 
+-#if defined( CINDER_GST_HAS_GL ) && ! defined( CINDER_MAC )
++#if defined( CINDER_GST_HAS_GL ) && defined( CINDER_LINUX )
+     #if ! defined( CINDER_LINUX_EGL_ONLY )
+         // These files will include a glfw_config.h that's custom to Cinder.
+         #include "glfw/glfw3.h"
+@@ -523,6 +523,14 @@ bool GstPlayer::initialize()
+ 
+         auto platformData = std::dynamic_pointer_cast<ci::gl::PlatformDataMac>( ci::gl::context()->getPlatformData() );
+         mGstData.context  = gst_gl_context_new_wrapped( sGstGLDisplay, (guintptr)platformData->mCglContext, GST_GL_PLATFORM_CGL, GST_GL_API_OPENGL );
++#elif defined( CINDER_MSW )
++        if( ! sGstGLDisplay )
++            sGstGLDisplay = gst_gl_display_new ();
++        else
++            holdDisplayRef = true;
++
++        auto platformData = std::dynamic_pointer_cast<ci::gl::PlatformDataMsw>( ci::gl::context()->getPlatformData() );
++        mGstData.context  = gst_gl_context_new_wrapped( sGstGLDisplay, (guintptr)platformData->mGlrc, GST_GL_PLATFORM_WGL, GST_GL_API_OPENGL );
+ #endif
+         if( holdDisplayRef ) {
+             gst_object_ref( sGstGLDisplay );
+
+From 71276787c8c1a2b0cb6a68dfc78201649a4cf6fe Mon Sep 17 00:00:00 2001
+From: Petros Kataras <petroskataras@gmail.com>
+Date: Thu, 28 Dec 2017 12:06:56 +0100
+Subject: [PATCH 2/5] Fix indent.
+
+---
+ proj/cmake/platform_msw.cmake | 158 +++++++++++++++++++++---------------------
+ 1 file changed, 79 insertions(+), 79 deletions(-)
+
+diff --git a/proj/cmake/platform_msw.cmake b/proj/cmake/platform_msw.cmake
+index 7f020181d0..0b634f13c6 100755
+--- a/proj/cmake/platform_msw.cmake
++++ b/proj/cmake/platform_msw.cmake
+@@ -3,102 +3,102 @@ cmake_minimum_required( VERSION 2.8 FATAL_ERROR )
+ set( CINDER_PLATFORM "MSW" )
+ 
+ list( APPEND SRC_SET_MSW
+-	${CINDER_SRC_DIR}/cinder/CaptureImplDirectShow.cpp
+-	${CINDER_SRC_DIR}/cinder/msw/CinderMsw.cpp
+-	${CINDER_SRC_DIR}/cinder/msw/CinderMswGdiPlus.cpp
+-	${CINDER_SRC_DIR}/cinder/msw/StackWalker.cpp
+-	${CINDER_SRC_DIR}/cinder/ImageSourceFileWic.cpp
+-	${CINDER_SRC_DIR}/cinder/ImageTargetFileWic.cpp
+-	${CINDER_SRC_DIR}/cinder/UrlImplWinInet.cpp
+-	${CINDER_SRC_DIR}/glload/wgl_load_cpp.cpp
+-	${CINDER_SRC_DIR}/glload/wgl_load.c
+-	${CINDER_SRC_DIR}/AntTweakBar/TwDirect3D11.cpp
++    ${CINDER_SRC_DIR}/cinder/CaptureImplDirectShow.cpp
++    ${CINDER_SRC_DIR}/cinder/msw/CinderMsw.cpp
++    ${CINDER_SRC_DIR}/cinder/msw/CinderMswGdiPlus.cpp
++    ${CINDER_SRC_DIR}/cinder/msw/StackWalker.cpp
++    ${CINDER_SRC_DIR}/cinder/ImageSourceFileWic.cpp
++    ${CINDER_SRC_DIR}/cinder/ImageTargetFileWic.cpp
++    ${CINDER_SRC_DIR}/cinder/UrlImplWinInet.cpp
++    ${CINDER_SRC_DIR}/glload/wgl_load_cpp.cpp
++    ${CINDER_SRC_DIR}/glload/wgl_load.c
++    ${CINDER_SRC_DIR}/AntTweakBar/TwDirect3D11.cpp
+ )
+ 
+ list( APPEND SRC_SET_APP_MSW
+-	# TODO: should these two files be added to "cinder\\app" group?
+-	${CINDER_SRC_DIR}/cinder/app/AppScreenSaver.cpp
+-	#${CINDER_SRC_DIR}/cinder/app/RendererDx.cpp
+-
+-	${CINDER_SRC_DIR}/cinder/app/msw/AppImplMsw.cpp
+-	${CINDER_SRC_DIR}/cinder/app/msw/AppImplMswBasic.cpp
+-	${CINDER_SRC_DIR}/cinder/app/msw/AppImplMswScreenSaver.cpp
+-	${CINDER_SRC_DIR}/cinder/app/msw/AppMsw.cpp
+-	${CINDER_SRC_DIR}/cinder/app/msw/PlatformMsw.cpp
+-	${CINDER_SRC_DIR}/cinder/app/msw/RendererImpl2dGdi.cpp
+-	#${CINDER_SRC_DIR}/cinder/app/msw/RendererImplDx.cpp
+-	#${CINDER_SRC_DIR}/cinder/app/msw/RendererImplGlAngle.cpp
+-	${CINDER_SRC_DIR}/cinder/app/msw/RendererImplGlMsw.cpp
++    # TODO: should these two files be added to "cinder\\app" group?
++    ${CINDER_SRC_DIR}/cinder/app/AppScreenSaver.cpp
++    #${CINDER_SRC_DIR}/cinder/app/RendererDx.cpp
++
++    ${CINDER_SRC_DIR}/cinder/app/msw/AppImplMsw.cpp
++    ${CINDER_SRC_DIR}/cinder/app/msw/AppImplMswBasic.cpp
++    ${CINDER_SRC_DIR}/cinder/app/msw/AppImplMswScreenSaver.cpp
++    ${CINDER_SRC_DIR}/cinder/app/msw/AppMsw.cpp
++    ${CINDER_SRC_DIR}/cinder/app/msw/PlatformMsw.cpp
++    ${CINDER_SRC_DIR}/cinder/app/msw/RendererImpl2dGdi.cpp
++    #${CINDER_SRC_DIR}/cinder/app/msw/RendererImplDx.cpp
++    #${CINDER_SRC_DIR}/cinder/app/msw/RendererImplGlAngle.cpp
++    ${CINDER_SRC_DIR}/cinder/app/msw/RendererImplGlMsw.cpp
+ )
+ 
+ list( APPEND SRC_SET_AUDIO_MSW
+-	${CINDER_SRC_DIR}/cinder/audio/msw/ContextWasapi.cpp
+-	${CINDER_SRC_DIR}/cinder/audio/msw/DeviceManagerWasapi.cpp
+-	${CINDER_SRC_DIR}/cinder/audio/msw/FileMediaFoundation.cpp
+-	${CINDER_SRC_DIR}/cinder/audio/msw/MswUtil.cpp
++    ${CINDER_SRC_DIR}/cinder/audio/msw/ContextWasapi.cpp
++    ${CINDER_SRC_DIR}/cinder/audio/msw/DeviceManagerWasapi.cpp
++    ${CINDER_SRC_DIR}/cinder/audio/msw/FileMediaFoundation.cpp
++    ${CINDER_SRC_DIR}/cinder/audio/msw/MswUtil.cpp
+ )
+ 
+ list( APPEND SRC_SET_CINDER_AUDIO_DSP
+-	${CINDER_SRC_DIR}/cinder/audio/dsp/ooura/fftsg.cpp
+-	${CINDER_SRC_DIR}/cinder/audio/dsp/ConverterR8brain.cpp
++    ${CINDER_SRC_DIR}/cinder/audio/dsp/ooura/fftsg.cpp
++    ${CINDER_SRC_DIR}/cinder/audio/dsp/ConverterR8brain.cpp
+ )
+ 
+ list( APPEND CINDER_SRC_FILES
+-	${SRC_SET_MSW}
+-	${SRC_SET_APP_MSW}
+-	${SRC_SET_AUDIO_MSW}
+-	${SRC_SET_CINDER_AUDIO_DSP}
++    ${SRC_SET_MSW}
++    ${SRC_SET_APP_MSW}
++    ${SRC_SET_AUDIO_MSW}
++    ${SRC_SET_CINDER_AUDIO_DSP}
+ )
+ 
+ # Option for using GStreamer under MSW.
+ if( CINDER_MSW )
+-	option( CINDER_MSW_USE_GSTREAMER "Use GStreamer for video playback." OFF )
++    option( CINDER_MSW_USE_GSTREAMER "Use GStreamer for video playback." OFF )
+ endif()
+ 
+ if( CINDER_MSW_USE_GSTREAMER )
+     set( GST_ROOT $ENV{GSTREAMER_1_0_ROOT_X86_64} )
+     if( GST_ROOT )
+-	    list( APPEND CINDER_LIBS_DEPENDS 
+-	                ${GST_ROOT}/lib/gstreamer-1.0.lib
+-	                ${GST_ROOT}/lib/gstapp-1.0.lib
+-	                ${GST_ROOT}/lib/gstvideo-1.0.lib
+-	                ${GST_ROOT}/lib/gstbase-1.0.lib
+-	                ${GST_ROOT}/lib/gstnet-1.0.lib
+-	                ${GST_ROOT}/lib/gstaudio-1.0.lib
++        list( APPEND CINDER_LIBS_DEPENDS 
++                    ${GST_ROOT}/lib/gstreamer-1.0.lib
++                    ${GST_ROOT}/lib/gstapp-1.0.lib
++                    ${GST_ROOT}/lib/gstvideo-1.0.lib
++                    ${GST_ROOT}/lib/gstbase-1.0.lib
++                    ${GST_ROOT}/lib/gstnet-1.0.lib
++                    ${GST_ROOT}/lib/gstaudio-1.0.lib
+                     ${GST_ROOT}/lib/gstgl-1.0.lib
+-	                ${GST_ROOT}/lib/gobject-2.0.lib
+-	                ${GST_ROOT}/lib/gmodule-2.0.lib
+-	                ${GST_ROOT}/lib/gthread-2.0.lib
+-	                ${GST_ROOT}/lib/glib-2.0.lib
+-	                ${GST_ROOT}/lib/gio-2.0.lib
+-	                ${GST_ROOT}/lib/pangowin32-1.0.lib
+-	                ${GST_ROOT}/lib/pangocairo-1.0.lib
+-	                ${GST_ROOT}/lib/gdk_pixbuf-2.0.lib
+-	                ${GST_ROOT}/lib/pango-1.0.lib
+-	                ${GST_ROOT}/lib/cairo.lib
+-	                ${GST_ROOT}/lib/ffi.lib
+-	                ${GST_ROOT}/lib/intl.lib )
+-
+-	    list( APPEND CINDER_INCLUDE_SYSTEM_PRIVATE 
+-	                ${GST_ROOT}/include 
++                    ${GST_ROOT}/lib/gobject-2.0.lib
++                    ${GST_ROOT}/lib/gmodule-2.0.lib
++                    ${GST_ROOT}/lib/gthread-2.0.lib
++                    ${GST_ROOT}/lib/glib-2.0.lib
++                    ${GST_ROOT}/lib/gio-2.0.lib
++                    ${GST_ROOT}/lib/pangowin32-1.0.lib
++                    ${GST_ROOT}/lib/pangocairo-1.0.lib
++                    ${GST_ROOT}/lib/gdk_pixbuf-2.0.lib
++                    ${GST_ROOT}/lib/pango-1.0.lib
++                    ${GST_ROOT}/lib/cairo.lib
++                    ${GST_ROOT}/lib/ffi.lib
++                    ${GST_ROOT}/lib/intl.lib )
++
++        list( APPEND CINDER_INCLUDE_SYSTEM_PRIVATE 
++                    ${GST_ROOT}/include 
+                     ${GST_ROOT}/include/gstreamer-1.0
+                     ${GST_ROOT}/include/glib-2.0
+                     ${GST_ROOT}/lib/gstreamer-1.0/include
+                     ${GST_ROOT}/lib/glib-2.0/include
+-	                ${CINDER_INC_DIR}/cinder/linux )
++                    ${CINDER_INC_DIR}/cinder/linux )
+ 
+-	    list( APPEND CINDER_SRC_FILES 
+-	                ${CINDER_SRC_DIR}/cinder/linux/GstPlayer.cpp 
+-	                ${CINDER_SRC_DIR}/cinder/linux/Movie.cpp )
++        list( APPEND CINDER_SRC_FILES 
++                    ${CINDER_SRC_DIR}/cinder/linux/GstPlayer.cpp 
++                    ${CINDER_SRC_DIR}/cinder/linux/Movie.cpp )
+ 
+-	    list( APPEND CINDER_DEFINES CINDER_MSW_USE_GSTREAMER )
+-	else()
+-		message( WARNING "Requested GStreamer video playback support for MSW but no suitable GStreamer installation found. Make sure that GStreamer is installed properly and GSTREAMER_1_0_ROOT_X86_64 is defined in your env variables. " )
++        list( APPEND CINDER_DEFINES CINDER_MSW_USE_GSTREAMER )
++    else()
++        message( WARNING "Requested GStreamer video playback support for MSW but no suitable GStreamer installation found. Make sure that GStreamer is installed properly and GSTREAMER_1_0_ROOT_X86_64 is defined in your env variables. " )
+     endif()
+ endif()
+ 
+-source_group( "cinder\\msw"       	FILES ${SRC_SET_MSW} )
+-source_group( "cinder\\app\\msw"  	FILES ${SRC_SET_APP_MSW} )
++source_group( "cinder\\msw"         FILES ${SRC_SET_MSW} )
++source_group( "cinder\\app\\msw"    FILES ${SRC_SET_APP_MSW} )
+ source_group( "cinder\\audio\\msw"  FILES ${SRC_SET_AUDIO_MSW} )
+ source_group( "cinder\\audio\\dsp"  FILES ${SRC_SET_CINDER_AUDIO_DSP} )
+ 
+@@ -110,20 +110,20 @@ list( APPEND CINDER_INCLUDE_SYSTEM_PRIVATE
+ list( APPEND CINDER_DEFINES "_LIB;UNICODE;_UNICODE;NOMINMAX;_WIN32_WINNT=0x0601;_CRT_SECURE_NO_WARNINGS;_SCL_SECURE_NO_WARNINGS" )
+ 
+ if( MSVC )
+-	# Override the default /MD with /MT
+-	foreach( 
+-		flag_var
+-		CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_RELWITHDEBINFO 
+-		CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_RELWITHDEBINFO 
+-	)
+-		if( ${flag_var} MATCHES "/MD" )
+-			string( REGEX REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}" )
+-		endif()
+-	endforeach()
+-	# Force synchronous PDB writes
+-	add_compile_options( /FS )
+-	# Force multiprocess compilation
+-	add_compile_options( /MP )
++    # Override the default /MD with /MT
++    foreach( 
++        flag_var
++        CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_RELWITHDEBINFO 
++        CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE CMAKE_CXX_FLAGS_MINSIZEREL CMAKE_CXX_FLAGS_RELWITHDEBINFO 
++    )
++        if( ${flag_var} MATCHES "/MD" )
++            string( REGEX REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}" )
++        endif()
++    endforeach()
++    # Force synchronous PDB writes
++    add_compile_options( /FS )
++    # Force multiprocess compilation
++    add_compile_options( /MP )
+     # Static library flags
+     set( CINDER_STATIC_LIBS_FLAGS_DEBUG     "/NODEFAULTLIB:LIBCMT /NODEFAULTLIB:LIBCPMT" )
+    
+
+From 0dbcff5022e11c837fdf087c02a7793064424b53 Mon Sep 17 00:00:00 2001
+From: Petros Kataras <petroskataras@gmail.com>
+Date: Tue, 2 Jan 2018 12:26:57 +0100
+Subject: [PATCH 3/5] Cleanup gstreamer lib dependencies.
+
+---
+ proj/cmake/platform_msw.cmake | 9 +--------
+ 1 file changed, 1 insertion(+), 8 deletions(-)
+
+diff --git a/proj/cmake/platform_msw.cmake b/proj/cmake/platform_msw.cmake
+index 0b634f13c6..32fa598f0a 100755
+--- a/proj/cmake/platform_msw.cmake
++++ b/proj/cmake/platform_msw.cmake
+@@ -70,14 +70,7 @@ if( CINDER_MSW_USE_GSTREAMER )
+                     ${GST_ROOT}/lib/gmodule-2.0.lib
+                     ${GST_ROOT}/lib/gthread-2.0.lib
+                     ${GST_ROOT}/lib/glib-2.0.lib
+-                    ${GST_ROOT}/lib/gio-2.0.lib
+-                    ${GST_ROOT}/lib/pangowin32-1.0.lib
+-                    ${GST_ROOT}/lib/pangocairo-1.0.lib
+-                    ${GST_ROOT}/lib/gdk_pixbuf-2.0.lib
+-                    ${GST_ROOT}/lib/pango-1.0.lib
+-                    ${GST_ROOT}/lib/cairo.lib
+-                    ${GST_ROOT}/lib/ffi.lib
+-                    ${GST_ROOT}/lib/intl.lib )
++                    ${GST_ROOT}/lib/gio-2.0.lib )
+ 
+         list( APPEND CINDER_INCLUDE_SYSTEM_PRIVATE 
+                     ${GST_ROOT}/include 
+
+From afa309060328ebd2e6d270c0aadc1818689c8d24 Mon Sep 17 00:00:00 2001
+From: Petros Kataras <petroskataras@gmail.com>
+Date: Wed, 3 Jan 2018 14:30:56 +0100
+Subject: [PATCH 4/5] Switch to Url to provide cross-platform support of the
+ GstPlayer test app.
+
+---
+ .../GstPlayerRefactorTest/src/GstPlayerTestApp.cpp | 30 ++++++++++------------
+ 1 file changed, 13 insertions(+), 17 deletions(-)
+
+diff --git a/test/Linux/GstPlayerRefactorTest/src/GstPlayerTestApp.cpp b/test/Linux/GstPlayerRefactorTest/src/GstPlayerTestApp.cpp
+index 5577c61e9e..6b4bb5fac0 100644
+--- a/test/Linux/GstPlayerRefactorTest/src/GstPlayerTestApp.cpp
++++ b/test/Linux/GstPlayerRefactorTest/src/GstPlayerTestApp.cpp
+@@ -34,7 +34,7 @@ class GstPlayerTestApp : public App {
+ 	void update() override;
+ 	void draw() override;
+ 
+-	void loadMovieFile( const fs::path &path );
++	void loadMovieFile( const Url &path );
+ 
+ 	void testPlayPause();
+ 	void toggleVideoPlayback();
+@@ -71,10 +71,10 @@ class GstPlayerTestApp : public App {
+ 	float           mLastStepPosition   = 0.0f;
+ 
+     // Reload
+-    double          mTriggerReloadRate = 4.0;
+-    bool            mRandomizeReloadRate = true;
++    double          mTriggerReloadRate = 15.0;
++    bool            mRandomizeReloadRate = false;
+     double          mTimeLastReloadTrigger;
+-    std::vector<fs::path> mReloadPaths;
++    std::vector<Url> mReloadPaths;
+ 
+ 	TestCase		mCurrentTestCase = TEST_RELOADING;
+ 
+@@ -93,9 +93,9 @@ void GstPlayerTestApp::setup()
+ 	
+ 	CI_LOG_I( "\n--- TESTING LEVELS END----\n\n");
+ 
+-    loadMovieFile( "https://download.blender.org/durian/trailer/sintel_trailer-480p.mp4" );
+-    mReloadPaths.push_back( "http://pdl.warnerbros.com/wbol/us/dd/med/northbynorthwest/quicktime_page/nbnf_airplane_explosion_qt_500.mov" );
+-    mReloadPaths.push_back( "https://download.blender.org/durian/trailer/sintel_trailer-480p.mp4" );
++    loadMovieFile( Url( "https://download.blender.org/durian/trailer/sintel_trailer-480p.mp4" ) );
++    mReloadPaths.push_back( Url( "http://pdl.warnerbros.com/wbol/us/dd/med/northbynorthwest/quicktime_page/nbnf_airplane_explosion_qt_500.mov" ) );
++    mReloadPaths.push_back( Url( "https://download.blender.org/durian/trailer/sintel_trailer-480p.mp4" ) );
+     mTriggerTimer.start();
+     mTimeLastPlayPauseTrigger = mTriggerTimer.getSeconds();
+ }
+@@ -199,7 +199,7 @@ void GstPlayerTestApp::testReload()
+ void GstPlayerTestApp::newLoad()
+ {
+     static int currentMovieIndex = 0;
+-    fs::path movieToLoad = mReloadPaths[ currentMovieIndex % 2 ];
++    auto movieToLoad = mReloadPaths[ currentMovieIndex % 2 ];
+     currentMovieIndex++;
+     loadMovieFile( movieToLoad );
+ }
+@@ -265,9 +265,6 @@ void GstPlayerTestApp::draw()
+ void GstPlayerTestApp::keyDown( KeyEvent event )
+ {
+     if( event.getCode() == KeyEvent::KEY_o ) {
+-        fs::path moviePath = getOpenFilePath();
+-        if( ! moviePath.empty() )
+-            loadMovieFile( moviePath );
+     }
+     else if( event.getCode() == KeyEvent::KEY_p ) {
+         if( mMovie ) mMovie->stop();
+@@ -284,18 +281,18 @@ void GstPlayerTestApp::keyDown( KeyEvent event )
+     }
+ }
+ 
+-void GstPlayerTestApp::loadMovieFile( const fs::path &moviePath )
++void GstPlayerTestApp::loadMovieFile( const Url &movieUrl )
+ {
+     try {
+         // load up the movie, set it to loop, and begin playing
+-        mMovie = qtime::MovieGl::create( moviePath );
++        mMovie = qtime::MovieGl::create( movieUrl );
+         mMovie->setLoop();
+         mMovie->play();
+-	console() << "Playing: " << mMovie->isPlaying() << std::endl;
++        console() << "Playing: " << mMovie->isPlaying() << std::endl;
+     }
+     catch( ci::Exception &exc ) {
+-        console() << "Exception caught trying to load the movie from path: " << moviePath << ", what: " << exc.what() << std::endl;
+-	mMovie.reset();
++        console() << "Exception caught trying to load the movie from path: " << movieUrl << ", what: " << exc.what() << std::endl;
++        mMovie.reset();
+     }
+ 
+     mFrameTexture.reset();
+@@ -308,7 +305,6 @@ void GstPlayerTestApp::mouseDown( MouseEvent event )
+ 
+ void GstPlayerTestApp::fileDrop( FileDropEvent event )
+ {
+-    loadMovieFile( event.getFile( 0 ) );
+ }
+ 
+ CINDER_APP( GstPlayerTestApp, RendererGl, GstPlayerTestApp::prepareSettings );
+
+From 3ac4c8ca4f092038ac7192277f4e2f142ca538b4 Mon Sep 17 00:00:00 2001
+From: Petros Kataras <petroskataras@gmail.com>
+Date: Wed, 10 Jan 2018 16:36:39 +0100
+Subject: [PATCH 5/5] Fix GstPlayer sync mode context sharing on MSW.
+
+---
+ src/cinder/linux/GstPlayer.cpp | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/src/cinder/linux/GstPlayer.cpp b/src/cinder/linux/GstPlayer.cpp
+index f852522806..1d9444e76c 100644
+--- a/src/cinder/linux/GstPlayer.cpp
++++ b/src/cinder/linux/GstPlayer.cpp
+@@ -528,9 +528,10 @@ bool GstPlayer::initialize()
+             sGstGLDisplay = gst_gl_display_new ();
+         else
+             holdDisplayRef = true;
+-
++        ci::gl::env()->makeContextCurrent( nullptr );
+         auto platformData = std::dynamic_pointer_cast<ci::gl::PlatformDataMsw>( ci::gl::context()->getPlatformData() );
+         mGstData.context  = gst_gl_context_new_wrapped( sGstGLDisplay, (guintptr)platformData->mGlrc, GST_GL_PLATFORM_WGL, GST_GL_API_OPENGL );
++        ci::gl::context()->makeCurrent();
+ #endif
+         if( holdDisplayRef ) {
+             gst_object_ref( sGstGLDisplay );
