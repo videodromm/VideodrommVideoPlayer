@@ -1,0 +1,45 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="C:\cpp\videodromm\VideodrommVideoPlayer\src\VideoPlayerApp.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Cinder\blocks\Cinder-Warping\src\Warp.cpp">
+      <Filter>Blocks\Cinder-Warping\src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Cinder\blocks\Cinder-Warping\src\WarpBilinear.cpp">
+      <Filter>Blocks\Cinder-Warping\src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Cinder\blocks\Cinder-Warping\src\WarpPerspective.cpp">
+      <Filter>Blocks\Cinder-Warping\src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\Cinder\blocks\Cinder-Warping\src\WarpPerspectiveBilinear.cpp">
+      <Filter>Blocks\Cinder-Warping\src</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\cpp\videodromm\VideodrommVideoPlayer\proj\cmake\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{A9016174-DC13-3871-9AC9-E46A4C387BB1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Blocks">
+      <UniqueIdentifier>{295d69b5-4919-42bf-8cb0-a9e500c7f3ce}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Blocks\Cinder-Warping">
+      <UniqueIdentifier>{add5e8b7-dc07-4b14-96f6-d8d6778a4fa9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Blocks\Cinder-Warping\include">
+      <UniqueIdentifier>{df683ed1-fd77-45d1-991b-535e96687031}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Blocks\Cinder-Warping\src">
+      <UniqueIdentifier>{0e16f3c0-883a-4edc-9cce-59c369908194}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\..\Cinder\blocks\Cinder-Warping\include\Warp.h">
+      <Filter>Blocks\Cinder-Warping\include</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

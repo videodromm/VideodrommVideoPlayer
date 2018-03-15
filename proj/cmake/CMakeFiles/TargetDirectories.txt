@@ -1,0 +1,3 @@
+C:/cpp/videodromm/VideodrommVideoPlayer/proj/cmake/CMakeFiles/VideoPlayer.dir
+C:/cpp/videodromm/VideodrommVideoPlayer/proj/cmake/CMakeFiles/ALL_BUILD.dir
+C:/cpp/videodromm/VideodrommVideoPlayer/proj/cmake/CMakeFiles/ZERO_CHECK.dir
