@@ -106,7 +106,7 @@ bool VideoPlayerApp::restore()
 				mMainWindowHeight = 720;
 				mRenderWidth = 1280;
 				mRenderHeight = 720;
-				mRenderX = 1024;
+				mRenderX = 0;
 				mRenderY = 0;
 			}
 			else
