@@ -36,10 +36,21 @@
     <Filter Include="Blocks\Cinder-Warping\src">
       <UniqueIdentifier>{0e16f3c0-883a-4edc-9cce-59c369908194}</UniqueIdentifier>
     </Filter>
+    <Filter Include="assets">
+      <UniqueIdentifier>{ae222f19-7614-46e6-a543-2bcb3270a4ec}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\..\..\Cinder\blocks\Cinder-Warping\include\Warp.h">
       <Filter>Blocks\Cinder-Warping\include</Filter>
     </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Xml Include="..\..\assets\VDSettings.xml">
+      <Filter>assets</Filter>
+    </Xml>
+    <Xml Include="..\..\assets\warps.xml">
+      <Filter>assets</Filter>
+    </Xml>
   </ItemGroup>
 </Project>

@@ -332,6 +332,10 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
   <ItemGroup>
     <ClInclude Include="..\..\..\..\Cinder\blocks\Cinder-Warping\include\Warp.h" />
   </ItemGroup>
+  <ItemGroup>
+    <Xml Include="..\..\assets\VDSettings.xml" />
+    <Xml Include="..\..\assets\warps.xml" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

@@ -3,7 +3,7 @@
 #include "cinder/gl/gl.h"
 #include "cinder/Surface.h"
 #include "cinder/gl/Texture.h"
-
+#include "cinder/Xml.h"
 #include "cinder/qtime/QuickTimeGl.h"
 #include "Warp.h"
 
@@ -29,29 +29,41 @@ public:
 	void cleanup() override;
 	void setUIVisibility(bool visible);
 private:
-
+	// layout
+	bool					mAutoLayout;
+	int						mDisplayCount, mMainWindowWidth, mMainWindowHeight, mRenderWidth, mRenderHeight, mRenderX, mRenderY;
+	bool					mCursorVisible;
+	int						getWindowsResolution();
+	bool					restore();
 	// gstreamer
 	void loadMovieFile(const fs::path &path);
-
 	gl::TextureRef			mFrameTexture;
 	qtime::MovieGlRef		mMovie;
 	// Warping
-	WarpList		mWarps;
-	fs::path		mSettings;
-	Area			mSrcArea;
+	WarpList				mWarps;
+	fs::path				mSettings;
 };
 
 
 VideoPlayerApp::VideoPlayerApp()
 {
 	disableFrameRate();
-
 	fs::path moviePath = getOpenFilePath();
 	console() << "moviePath: " << moviePath << std::endl;
 
 	if (!moviePath.empty())
 		loadMovieFile(moviePath);
 
+	mCursorVisible = false;
+	setUIVisibility(mCursorVisible);
+	mAutoLayout = true;
+	if (restore()) {
+		getWindow()->setPos(mRenderX, mRenderY);
+		setWindowSize(mRenderWidth, mRenderHeight);
+	}
+	else {
+		getWindowsResolution();
+	}
 	// initialize warps
 	mSettings = getAssetPath("") / "warps.xml";
 	if (fs::exists(mSettings)) {
@@ -60,13 +72,100 @@ VideoPlayerApp::VideoPlayerApp()
 	}
 	else {
 		// otherwise create a warp from scratch
-		mWarps.push_back(WarpBilinear::create());
-		mWarps.push_back(WarpPerspective::create());
 		mWarps.push_back(WarpPerspectiveBilinear::create());
 	}
-	// adjust the content size of the warps
-	mSrcArea = Area(0, 0, getWindowWidth(), getWindowHeight());
-	Warp::setSize(mWarps,ivec2(1280,720));
+	// initialize the content size of the warps
+	Warp::setSize(mWarps, ivec2(1280, 720));
+}
+bool VideoPlayerApp::restore()
+{
+	// check to see if Settings.xml file exists
+	fs::path params = getAssetPath("") / "VDSettings.xml";
+	if (fs::exists(params)) {
+		// if it does, restore
+		const XmlTree xml(loadFile(params));
+
+		if (!xml.hasChild("settings")) {
+			return false;
+		}
+		else {
+			const XmlTree settings = xml.getChild("settings");
+			if (settings.hasChild("AutoLayout")) {
+				XmlTree AutoLayout = settings.getChild("AutoLayout");
+				mAutoLayout = AutoLayout.getAttributeValue<bool>("value");
+			}
+			if (settings.hasChild("CursorVisible")) {
+				XmlTree CursorVisible = settings.getChild("CursorVisible");
+				mCursorVisible = CursorVisible.getAttributeValue<bool>("value");
+			}
+			// if AutoLayout is false we have to read the custom screen layout
+			if (mAutoLayout)
+			{
+				// init, overriden by GetWindowsResolution
+				mMainWindowWidth = 1280;
+				mMainWindowHeight = 720;
+				mRenderWidth = 1280;
+				mRenderHeight = 720;
+				mRenderX = 1024;
+				mRenderY = 0;
+			}
+			else
+			{
+				if (settings.hasChild("RenderWidth")) {
+					XmlTree RenderWidth = settings.getChild("RenderWidth");
+					mRenderWidth = RenderWidth.getAttributeValue<int>("value");
+				}
+				if (settings.hasChild("RenderHeight")) {
+					XmlTree RenderHeight = settings.getChild("RenderHeight");
+					mRenderHeight = RenderHeight.getAttributeValue<int>("value");
+				}
+				if (settings.hasChild("RenderX")) {
+					XmlTree RenderX = settings.getChild("RenderX");
+					mRenderX = RenderX.getAttributeValue<int>("value");
+				}
+				if (settings.hasChild("RenderY")) {
+					XmlTree RenderY = settings.getChild("RenderY");
+					mRenderY = RenderY.getAttributeValue<int>("value");
+				}
+			}
+			return true;
+		}
+	}
+	else {
+		// if it doesn't, return false
+		return false;
+	}
+}
+
+int VideoPlayerApp::getWindowsResolution()
+{
+	mDisplayCount = 0;
+	int w = Display::getMainDisplay()->getWidth();
+	int h = Display::getMainDisplay()->getHeight();
+
+	// Display sizes
+	if (mAutoLayout)
+	{
+		mMainWindowWidth = w;
+		mMainWindowHeight = h;
+		mRenderX = mMainWindowWidth;
+		// for MODE_MIX and triplehead(or doublehead), we only want 1/3 of the screen centered	
+		for (auto display : Display::getDisplays())
+		{
+			mDisplayCount++;
+			mRenderWidth = display->getWidth();
+			mRenderHeight = display->getHeight();
+		}
+		mRenderY = 0;
+	}
+	else
+	{
+		for (auto display : Display::getDisplays())
+		{
+			mDisplayCount++;
+		}
+	}
+	return w;
 }
 void VideoPlayerApp::resize()
 {
@@ -75,7 +174,6 @@ void VideoPlayerApp::resize()
 }
 void VideoPlayerApp::setUIVisibility(bool visible)
 {
-
 	if (visible)
 	{
 		showCursor();
@@ -92,7 +190,6 @@ void VideoPlayerApp::fileDrop(FileDropEvent event)
 }
 void VideoPlayerApp::update()
 {
-
 	if (mMovie)
 		mFrameTexture = mMovie->getTexture();
 
@@ -141,6 +238,7 @@ void VideoPlayerApp::keyDown(KeyEvent event)
 {
 	// pass this key event to the warp editor first
 	if (!Warp::handleKeyDown(mWarps, event)) {
+		fs::path moviePath;
 		// warp editor did not handle the key, so handle it here
 		switch (event.getCode()) {
 		case KeyEvent::KEY_ESCAPE:
@@ -160,14 +258,17 @@ void VideoPlayerApp::keyDown(KeyEvent event)
 			Warp::enableEditMode(!Warp::isEditModeEnabled());
 			break;
 		case KeyEvent::KEY_o:
-			fs::path moviePath = getOpenFilePath();
+			moviePath = getOpenFilePath();
 			if (!moviePath.empty())
 				loadMovieFile(moviePath);
 			break;
+		case KeyEvent::KEY_h:
+			// mouse cursor and ui visibility
+			mCursorVisible = !mCursorVisible;
+			setUIVisibility(mCursorVisible);
+			break;
 		}
 	}
-	
-
 }
 void VideoPlayerApp::keyUp(KeyEvent event)
 {
@@ -184,8 +285,6 @@ void VideoPlayerApp::loadMovieFile(const fs::path &moviePath)
 		
 		mMovie->setLoop();
 		mMovie->play();
-		// mSrcArea = mMovie->getBounds();
-		// Warp::setSize(mWarps, mMovie->getSize());
 
 		console() << "Playing: " << mMovie->isPlaying() << std::endl;
 	}
@@ -200,14 +299,14 @@ void VideoPlayerApp::draw()
 {
 	gl::clear(Color::black());
 	gl::color(Color::white());
-
+	getWindow()->setTitle(toString(floor(getAverageFps())) + " fps");
 	if (mFrameTexture) {
+		
+		Warp::setSize(mWarps, mFrameTexture->getSize());
 		for (auto &warp : mWarps) {
 			warp->begin();
 			Rectf centeredRect = Rectf(mFrameTexture->getBounds()).getCenteredFit(getWindowBounds(), true);
 			gl::draw(mFrameTexture, centeredRect);
-			//warp->draw(mFrameTexture, mFrameTexture->getBounds());
-			//warp->draw(mFrameTexture, mSrcArea, warp->getBounds());
 			warp->end();
 		}
 	}
@@ -219,7 +318,7 @@ void prepareSettings(App::Settings *settings)
 	settings->setMultiTouchEnabled(false);
 	settings->setBorderless();
 #ifdef _DEBUG
-	settings->setConsoleWindowEnabled();
+	//settings->setConsoleWindowEnabled();
 #endif
 }
 
