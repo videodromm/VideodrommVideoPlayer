@@ -39,6 +39,8 @@ private:
 	void loadMovieFile(const fs::path &path);
 	gl::TextureRef			mFrameTexture;
 	qtime::MovieGlRef		mMovie;
+	string					mMovieToLoad;
+	fs::path				mMoviePath;
 	// Warping
 	WarpList				mWarps;
 	fs::path				mSettings;
@@ -48,18 +50,25 @@ private:
 VideoPlayerApp::VideoPlayerApp()
 {
 	disableFrameRate();
-	fs::path moviePath = getOpenFilePath();
-	console() << "moviePath: " << moviePath << std::endl;
-
-	if (!moviePath.empty())
-		loadMovieFile(moviePath);
-
+	mMovieToLoad = "";
 	mCursorVisible = false;
 	setUIVisibility(mCursorVisible);
 	mAutoLayout = true;
 	if (restore()) {
 		getWindow()->setPos(mRenderX, mRenderY);
 		setWindowSize(mRenderWidth, mRenderHeight);
+		if (mMovieToLoad.length() > 0) {
+			mMoviePath = getAssetPath("") / mMovieToLoad;
+			
+		}
+		else {
+			mMoviePath = getOpenFilePath();
+		}
+		console() << "moviePath: " << mMoviePath << std::endl;
+
+		if (!mMoviePath.empty())
+			loadMovieFile(mMoviePath);
+
 	}
 	else {
 		getWindowsResolution();
@@ -98,6 +107,11 @@ bool VideoPlayerApp::restore()
 				XmlTree CursorVisible = settings.getChild("CursorVisible");
 				mCursorVisible = CursorVisible.getAttributeValue<bool>("value");
 			}
+			if (settings.hasChild("MovieToLoad")) {
+				XmlTree MovieToLoad = settings.getChild("MovieToLoad");
+				mMovieToLoad = MovieToLoad.getAttributeValue<string>("value");
+			}
+			
 			// if AutoLayout is false we have to read the custom screen layout
 			if (mAutoLayout)
 			{
@@ -318,7 +332,7 @@ void prepareSettings(App::Settings *settings)
 	settings->setMultiTouchEnabled(false);
 	settings->setBorderless();
 #ifdef _DEBUG
-	//settings->setConsoleWindowEnabled();
+	settings->setConsoleWindowEnabled();
 #endif
 }
 
