@@ -49,8 +49,8 @@ private:
 
 VideoPlayerApp::VideoPlayerApp()
 {
-	disableFrameRate();
-	mMovieToLoad = "";
+	// disableFrameRate();
+	mMovieToLoad = "video.mp4";
 	mCursorVisible = false;
 	setUIVisibility(mCursorVisible);
 	mAutoLayout = true;
@@ -84,7 +84,7 @@ VideoPlayerApp::VideoPlayerApp()
 		mWarps.push_back(WarpPerspectiveBilinear::create());
 	}
 	// initialize the content size of the warps
-	Warp::setSize(mWarps, ivec2(1280, 720));
+	Warp::setSize(mWarps, ivec2(720, 480));
 }
 bool VideoPlayerApp::restore()
 {
@@ -116,10 +116,10 @@ bool VideoPlayerApp::restore()
 			if (mAutoLayout)
 			{
 				// init, overriden by GetWindowsResolution
-				mMainWindowWidth = 1280;
-				mMainWindowHeight = 720;
-				mRenderWidth = 1280;
-				mRenderHeight = 720;
+				mMainWindowWidth = 1024;
+				mMainWindowHeight =  768;
+				mRenderWidth = 1024;
+				mRenderHeight = 768;
 				mRenderX = 0;
 				mRenderY = 0;
 			}
@@ -316,10 +316,11 @@ void VideoPlayerApp::draw()
 	getWindow()->setTitle(toString(floor(getAverageFps())) + " fps");
 	if (mFrameTexture) {
 		
-		Warp::setSize(mWarps, mFrameTexture->getSize());
+		//Warp::setSize(mWarps, mFrameTexture->getSize());
 		for (auto &warp : mWarps) {
 			warp->begin();
-			Rectf centeredRect = Rectf(mFrameTexture->getBounds()).getCenteredFit(getWindowBounds(), true);
+			//Rectf centeredRect = Rectf(mFrameTexture->getBounds()).getCenteredFit(getWindowBounds(), true);
+			Rectf centeredRect = Rectf(ivec2(0,0), ivec2(720, 480));
 			gl::draw(mFrameTexture, centeredRect);
 			warp->end();
 		}
@@ -328,11 +329,11 @@ void VideoPlayerApp::draw()
 
 void prepareSettings(App::Settings *settings)
 {
-	settings->setWindowSize(1280, 720);
+	settings->setWindowSize(1024, 768);
 	settings->setMultiTouchEnabled(false);
 	settings->setBorderless();
 #ifdef _DEBUG
-	settings->setConsoleWindowEnabled();
+	//settings->setConsoleWindowEnabled();
 #endif
 }
 
